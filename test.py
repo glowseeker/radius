@@ -7,8 +7,6 @@ class MainWindow(QtWidgets.QMainWindow):
     
     def __init__(self):
         super().__init__()
-        # Set the window size and disable manual resizing
-        self.setFixedSize(800, 600)
 
         # Create layout and add to central widget
         self.layout = QtWidgets.QHBoxLayout()
@@ -21,14 +19,11 @@ class MainWindow(QtWidgets.QMainWindow):
             {'name': 'Inner Radius', 'type': 'float', 'value': 1, 'limits': (1, 10), 'step': 0.1},
             {'name': 'Outer Radius', 'type': 'float', 'value': 10, 'limits': (1, 10), 'step': 0.1},
             {'name': 'Starting Point', 'type': 'str', 'value': '(0, 0)', 'readonly': True},
+            {'name': 'Tangent Point', 'type': 'str', 'value': '(0, 0)', 'readonly': True}
         ]
         self.params = Parameter.create(name='params', type='group', children=params)
         self.parameter_tree = ParameterTree()
         self.parameter_tree.setParameters(self.params, showTop=False)
-
-        # Set initial limits
-        self.params.param('Inner Radius').setLimits((0, self.params.param('Outer Radius').value()))
-        self.params.param('Outer Radius').setLimits((self.params.param('Inner Radius').value(), 10))
 
         # Add parameter tree to layout
         self.parameter_tree.setMinimumWidth(200)
@@ -40,9 +35,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.plot_graph.setAspectLocked(True)
         self.plot_graph.showGrid(x=True, y=True)
         self.plot_graph.getViewBox().setRange(xRange=(-10, 10), yRange=(-10, 10))
-        self.plot_graph.getViewBox().setMouseEnabled(x=False, y=False)
         self.plot_graph.getAxis('bottom').setTickSpacing(1, 1)
         self.plot_graph.getAxis('left').setTickSpacing(1, 1)
+        self.plot_graph.getViewBox().setMouseEnabled(x=False, y=False)
         pen = pg.mkPen(width=2)
         self.plot_graph.plot([-11, 11], [0, 0], pen=pen)  # X-axis
         self.plot_graph.plot([0, 0], [-11, 11], pen=pen)  # Y-axis
@@ -60,9 +55,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.starting_point = pg.PlotDataItem(pen=None, symbolBrush='g', symbolSize=10)
         self.plot_graph.addItem(self.starting_point)
 
+        # Create a plot item for the tangent point
+        self.tangent_point = pg.PlotDataItem(pen=None, symbolBrush='g', symbolSize=10)
+        self.plot_graph.addItem(self.tangent_point)
+
         # Create a plot item for the tangent line
         self.tangent_line = pg.PlotDataItem(pen=pg.mkPen('g', width=2))
         self.plot_graph.addItem(self.tangent_line)
+
+        # Create a plot item for the extension line
+        self.extension_line = pg.PlotDataItem(pen=pg.mkPen('g', width=2))   
+        self.plot_graph.addItem(self.extension_line)
 
         # Draw circles
         self.inner_circle = pg.PlotDataItem(pen=pg.mkPen('b', width=2))
@@ -106,7 +109,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if param.name() == 'Inner Radius':
             self.params.param('Outer Radius').setLimits((value, 10))
         else:  # param.name() == 'Outer Radius'
-            self.params.param('Inner Radius').setLimits((0, value))
+            self.params.param('Inner Radius').setLimits((1, value))
+
 
     def update_starting_point(self, param, value):
         # Update starting point
@@ -120,16 +124,15 @@ class MainWindow(QtWidgets.QMainWindow):
         inner_radius = self.params.param('Inner Radius').value()
 
         # Calculate the angle of the tangent point
-        angle = np.arcsin(inner_radius / outer_radius)
-
-        # Calculate the coordinates of the tangent point on the inner circle
-        tangent_point_x = inner_radius * np.cos(angle)
-        tangent_point_y = inner_radius * np.sin(angle)
-
-        tangent_point = (tangent_point_x, tangent_point_y)
-
+        tangent_angle = np.cos(inner_radius / outer_radius)
+        starting_angle = 180-tangent_angle-90
+        adjacent_side = (outer_radius) / (np.sin(90)) * (np.sin(starting_angle))
+        
+        
         # Draw the tangent line
-        self.tangent_line.setData([0, tangent_point[0]], [outer_radius, tangent_point[1]])
+        self.tangent_line.setData([0, (tangent_point[0])], [outer_radius, (tangent_point[1])])
+        self.tangent_point.setData([tangent_point[0]], [tangent_point[1]])
+        self.params.param('Tangent Point').setValue(f'({tangent_point[0]}, {tangent_point[1]})')
 
 app = QtWidgets.QApplication([])
 main = MainWindow()
