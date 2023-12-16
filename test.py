@@ -1,3 +1,4 @@
+import math
 from PyQt5 import QtWidgets
 import numpy as np
 import pyqtgraph as pg
@@ -21,6 +22,7 @@ class MainWindow(QtWidgets.QMainWindow):
             {'name': 'Starting Point', 'type': 'str', 'value': '(0, 0)', 'readonly': True},
             {'name': 'Tangent Point', 'type': 'str', 'value': '(0, 0)', 'readonly': True},
             {'name': 'Intersection Point', 'type': 'str', 'value': '(0, 0)', 'readonly': True},
+            {'name': 'Steps', 'type': 'int', 'value': 1, 'limits': (1, 1000), 'step': 1},
         ]
         self.params = Parameter.create(name='params', type='group', children=params)
         self.parameter_tree = ParameterTree()
@@ -46,26 +48,19 @@ class MainWindow(QtWidgets.QMainWindow):
         # Connect parameter changes to circle update
         self.params.param('Inner Radius').sigValueChanged.connect(self.update_circles)
         self.params.param('Outer Radius').sigValueChanged.connect(self.update_circles)
-        self.params.param('Inner Radius').sigValueChanged.connect(self.update_limits)
-        self.params.param('Outer Radius').sigValueChanged.connect(self.update_limits)
-        self.params.param('Outer Radius').sigValueChanged.connect(self.update_starting_point)
-        self.params.param('Inner Radius').sigValueChanged.connect(self.update_starting_point)
-
+        self.params.param('Inner Radius').sigValueChanged.connect(self.radius_change)
+        self.params.param('Outer Radius').sigValueChanged.connect(self.radius_change)
+        self.params.param('Outer Radius').sigValueChanged.connect(self.steps_loop)
+        self.params.param('Inner Radius').sigValueChanged.connect(self.steps_loop)
+        self.params.param('Steps').sigValueChanged.connect(self.steps_loop)
         
         # Create a plot item for the starting point
         self.starting_point = pg.PlotDataItem(pen=None, symbolBrush='g', symbolSize=10)
         self.plot_graph.addItem(self.starting_point)
 
-        # Create a plot item for the tangent point
-        self.tangent_point = pg.PlotDataItem(pen=None, symbolBrush='g', symbolSize=10)
-        self.plot_graph.addItem(self.tangent_point)
-
         # Create a plot item for the tangent line
         self.tangent_line = pg.PlotDataItem(pen=pg.mkPen('g', width=2))
         self.plot_graph.addItem(self.tangent_line)
-
-        # Create a plot item for the intersection point
-        self.intersection_point = pg.PlotDataItem(pen=None, symbolBrush='g', symbolSize=15)
 
         # Draw circles
         self.inner_circle = pg.PlotDataItem(pen=pg.mkPen('b', width=2))
@@ -93,7 +88,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.outer_circle.setData(x, y)
 
         # Initialize starting point
-        self.update_starting_point(self.params.param('Outer Radius'), outer_radius)
+        self.steps_loop(self.params.param('Outer Radius'), outer_radius)
 
     def update_circles(self, param, value):
         # Calculate points for inner circle
@@ -105,44 +100,66 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self.outer_circle.setData(x, y)
     
-    def update_limits(self, param, value):
+    def radius_change(self, param, value):
         if param.name() == 'Inner Radius':
             self.params.param('Outer Radius').setLimits((value, 10))
         else:  # param.name() == 'Outer Radius'
             self.params.param('Inner Radius').setLimits((1, value))
 
+        for line in self.tangent_lines:
+            self.plot_graph.removeItem(line)
+            self.tangent_lines.clear()
 
-    def update_starting_point(self, param, value):
+    def steps_loop(self, param, value):
         outer_radius = self.params.param('Outer Radius').value()
+        outer_diameter = 2 * outer_radius
         inner_radius = self.params.param('Inner Radius').value()
+        inner_diameter = 2 * inner_radius
+        steps = self.params.param('Steps').value()
+        
+        # Create a list to store the lines
+        self.tangent_lines = []
+        
+        # Calculate the length of the line
+        length = np.sqrt(outer_diameter**2 - (inner_diameter**2))
+        
+        # Calculate the starting angle (in radians)
+        angle = np.degrees(np.arcsin(inner_diameter / outer_diameter))
 
-        # Update the position of the starting point plot item
-        self.params.param('Starting Point').setValue(f'(0, {outer_radius})')
-        self.starting_point.setData([0], [outer_radius])
+        # Set the current point to the starting point (0, outer_radius)
+        current_point_x = 0
+        current_point_y = outer_radius
 
-        # Calculate the angle of the tangent point
-        tangent_angle = np.radians(180) - np.arccos(inner_radius / outer_radius)
-        print(f"Tangent Angle: {np.degrees(tangent_angle)} degrees")
+        for _ in range(steps):
+            # Calculate the direction of the line from the current point to the origin
+            direction_x = -current_point_x
+            direction_y = -current_point_y
 
-        # Calculate the starting angle
-        starting_angle = (np.radians(180 - 90 - np.degrees(tangent_angle))) * -1
-        print(f"Starting Angle: {np.degrees(starting_angle)} degrees")
+            # Scale the direction vector to the desired length
+            scale = length / np.sqrt(direction_x**2 + direction_y**2)
+            direction_x *= scale
+            direction_y *= scale
 
-        # Calculate the length of the adjacent side
-        adjacent_side = 2 * inner_radius
-        print(f"Adjacent Side: {adjacent_side}")
+            # Rotate the direction vector by the desired angle
+            angle_rad = np.radians(angle)
+            rotated_x = direction_x * np.cos(angle_rad) - direction_y * np.sin(angle_rad)
+            rotated_y = direction_x * np.sin(angle_rad) + direction_y * np.cos(angle_rad)
 
-        # Calculate the coordinates of the intersection point on the outer circle
-        intersection_point_x = adjacent_side * np.cos(starting_angle)
-        intersection_point_y = -outer_radius * np.sin(tangent_angle)
-        intersection_point = (intersection_point_x, intersection_point_y)
-        print(f"Intersection Point: {intersection_point}")
+            # Calculate the coordinates of the tangent point
+            tangent_point_x = current_point_x + rotated_x
+            tangent_point_y = current_point_y + rotated_y
 
-        # Draw the line from the starting point to the intersection point
-        self.tangent_line.setData([0, intersection_point[0]], [outer_radius, intersection_point[1]])
+            # Create a new line and add it to the list
+            tangent_line = pg.PlotDataItem([current_point_x, tangent_point_x], [current_point_y, tangent_point_y], pen=pg.mkPen('g', width=2))
+            self.tangent_lines.append(tangent_line)
 
-        # Draw the intersection point on the plot
-        self.intersection_point.setData([intersection_point[0]], [intersection_point[1]])
+            # Add the line to the plot
+            self.plot_graph.addItem(tangent_line)
+
+            # Update the current point to the tangent point for the next iteration
+            current_point_x = tangent_point_x
+            current_point_y = tangent_point_y
+
 
 app = QtWidgets.QApplication([])
 main = MainWindow()
