@@ -19,9 +19,7 @@ class MainWindow(QtWidgets.QMainWindow):
         params = [
             {'name': 'Inner Radius', 'type': 'float', 'value': 1, 'limits': (1, 10), 'step': 0.1},
             {'name': 'Outer Radius', 'type': 'float', 'value': 10, 'limits': (1, 10), 'step': 0.1},
-            {'name': 'Starting Point', 'type': 'str', 'value': '(0, 0)', 'readonly': True},
-            {'name': 'Tangent Point', 'type': 'str', 'value': '(0, 0)', 'readonly': True},
-            {'name': 'Intersection Point', 'type': 'str', 'value': '(0, 0)', 'readonly': True},
+            {'name': 'Starting Point', 'type': 'str', 'value': '(0, 10)', 'readonly': True},
             {'name': 'Steps', 'type': 'int', 'value': 1, 'limits': (1, 1000), 'step': 1},
         ]
         self.params = Parameter.create(name='params', type='group', children=params)
@@ -53,14 +51,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.params.param('Outer Radius').sigValueChanged.connect(self.steps_loop)
         self.params.param('Inner Radius').sigValueChanged.connect(self.steps_loop)
         self.params.param('Steps').sigValueChanged.connect(self.steps_loop)
-        
-        # Create a plot item for the starting point
-        self.starting_point = pg.PlotDataItem(pen=None, symbolBrush='g', symbolSize=10)
-        self.plot_graph.addItem(self.starting_point)
 
-        # Create a plot item for the tangent line
-        self.tangent_line = pg.PlotDataItem(pen=pg.mkPen('g', width=2))
-        self.plot_graph.addItem(self.tangent_line)
+        # Initialize the list to store the lines
+        self.tangent_lines = []
 
         # Draw circles
         self.inner_circle = pg.PlotDataItem(pen=pg.mkPen('b', width=2))
@@ -101,14 +94,21 @@ class MainWindow(QtWidgets.QMainWindow):
             self.outer_circle.setData(x, y)
     
     def radius_change(self, param, value):
+        outer_radius = self.params.param('Outer Radius').value()
         if param.name() == 'Inner Radius':
             self.params.param('Outer Radius').setLimits((value, 10))
         else:  # param.name() == 'Outer Radius'
             self.params.param('Inner Radius').setLimits((1, value))
 
+        # Clear all the lines and redraw
         for line in self.tangent_lines:
             self.plot_graph.removeItem(line)
-            self.tangent_lines.clear()
+        self.tangent_lines.clear()
+
+        # Redraw the lines based on the new radius values
+        self.steps_loop(param, value)
+        # Update the value of the starting point
+        self.params.param('Starting Point').setValue(f'(0, {outer_radius})')
 
     def steps_loop(self, param, value):
         outer_radius = self.params.param('Outer Radius').value()
@@ -116,27 +116,41 @@ class MainWindow(QtWidgets.QMainWindow):
         inner_radius = self.params.param('Inner Radius').value()
         inner_diameter = 2 * inner_radius
         steps = self.params.param('Steps').value()
-        
-        # Create a list to store the lines
-        self.tangent_lines = []
-        
+
         # Calculate the length of the line
-        length = np.sqrt(outer_diameter**2 - (inner_diameter**2))
-        
+        length = np.sqrt(outer_diameter ** 2 - inner_diameter ** 2)
+
         # Calculate the starting angle (in radians)
         angle = np.degrees(np.arcsin(inner_diameter / outer_diameter))
+
+        # Get the current number of steps
+        current_steps = len(self.tangent_lines)
 
         # Set the current point to the starting point (0, outer_radius)
         current_point_x = 0
         current_point_y = outer_radius
 
-        for _ in range(steps):
+        # If the number of steps has been reduced, remove the excess lines
+        if current_steps > steps:
+            for _ in range(current_steps - steps):
+                # Remove the last line from the plot
+                self.plot_graph.removeItem(self.tangent_lines.pop())
+
+        # Add or update lines based on the number of steps required
+        for i in range(steps):
+            if i < current_steps:  # If the line already exists, update its position
+                tangent_line = self.tangent_lines[i]
+            else:  # If the line does not exist, create a new one
+                tangent_line = pg.PlotDataItem(pen=pg.mkPen('g', width=2))
+                self.tangent_lines.append(tangent_line)
+                self.plot_graph.addItem(tangent_line)
+
             # Calculate the direction of the line from the current point to the origin
             direction_x = -current_point_x
             direction_y = -current_point_y
 
             # Scale the direction vector to the desired length
-            scale = length / np.sqrt(direction_x**2 + direction_y**2)
+            scale = length / np.sqrt(direction_x ** 2 + direction_y ** 2)
             direction_x *= scale
             direction_y *= scale
 
@@ -149,17 +163,12 @@ class MainWindow(QtWidgets.QMainWindow):
             tangent_point_x = current_point_x + rotated_x
             tangent_point_y = current_point_y + rotated_y
 
-            # Create a new line and add it to the list
-            tangent_line = pg.PlotDataItem([current_point_x, tangent_point_x], [current_point_y, tangent_point_y], pen=pg.mkPen('g', width=2))
-            self.tangent_lines.append(tangent_line)
-
-            # Add the line to the plot
-            self.plot_graph.addItem(tangent_line)
+            # Update the line coordinates
+            tangent_line.setData([current_point_x, tangent_point_x], [current_point_y, tangent_point_y])
 
             # Update the current point to the tangent point for the next iteration
             current_point_x = tangent_point_x
             current_point_y = tangent_point_y
-
 
 app = QtWidgets.QApplication([])
 main = MainWindow()
