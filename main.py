@@ -17,11 +17,20 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Create parameters and tree
         params = [
-            {'name': 'Inner Radius', 'type': 'float', 'value': 1, 'limits': (1, 10), 'step': 0.1},
-            {'name': 'Outer Radius', 'type': 'float', 'value': 10, 'limits': (1, 10), 'step': 0.1},
-            {'name': 'Starting Point', 'type': 'str', 'value': '(0, 10)', 'readonly': True},
-            {'name': 'Steps', 'type': 'int', 'value': 1, 'limits': (1, 1000), 'step': 1},
+            {'name': 'Manual', 'type': 'group', 'children': [
+                {'name': 'Inner Radius', 'type': 'float', 'value': 1, 'limits': (1, 10), 'step': 0.1},
+                {'name': 'Outer Radius', 'type': 'float', 'value': 10, 'limits': (1, 10), 'step': 0.1},
+                {'name': 'Ratio', 'type': 'str', 'value': '1:10', 'readonly': True},
+                {'name': 'Starting Point', 'type': 'str', 'value': '(0, 10)', 'readonly': True},
+                {'name': 'Steps', 'type': 'int', 'value': 1, 'limits': (1, 1000), 'step': 1},
+                {'name': 'Complete', 'type': 'bool', 'value': False, 'readonly': True},
+            ]},
+            {'name': 'Solver', 'type': 'group', 'children': [
+                {'name': 'Desired edges', 'type': 'int', 'value': 1, 'limits': (1, 100), 'step': 1},
+                {'name': 'Necessary ratio', 'type': 'float', 'value': 1, 'limits': (1, 10), 'step': 0.0001, 'readonly': True},
+            ]},
         ]
+
         self.params = Parameter.create(name='params', type='group', children=params)
         self.parameter_tree = ParameterTree()
         self.parameter_tree.setParameters(self.params, showTop=False)
@@ -44,13 +53,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.plot_graph.plot([0, 0], [-11, 11], pen=pen)  # Y-axis
 
         # Connect parameter changes to circle update
-        self.params.param('Inner Radius').sigValueChanged.connect(self.update_circles)
-        self.params.param('Outer Radius').sigValueChanged.connect(self.update_circles)
-        self.params.param('Inner Radius').sigValueChanged.connect(self.radius_change)
-        self.params.param('Outer Radius').sigValueChanged.connect(self.radius_change)
-        self.params.param('Outer Radius').sigValueChanged.connect(self.steps_loop)
-        self.params.param('Inner Radius').sigValueChanged.connect(self.steps_loop)
-        self.params.param('Steps').sigValueChanged.connect(self.steps_loop)
+        self.params.param('Manual', 'Inner Radius').sigValueChanged.connect(self.update_circles)
+        self.params.param('Manual', 'Outer Radius').sigValueChanged.connect(self.update_circles)
+        self.params.param('Manual', 'Inner Radius').sigValueChanged.connect(self.radius_change)
+        self.params.param('Manual', 'Outer Radius').sigValueChanged.connect(self.radius_change)
+        self.params.param('Manual', 'Outer Radius').sigValueChanged.connect(self.steps_loop)
+        self.params.param('Manual', 'Inner Radius').sigValueChanged.connect(self.steps_loop)
+        self.params.param('Manual', 'Steps').sigValueChanged.connect(self.steps_loop)
+        self.params.param('Manual', 'Ratio').sigValueChanged.connect(self.radius_change)
 
         # Initialize the list to store the lines
         self.tangent_lines = []
@@ -66,8 +76,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.layout.addWidget(self.plot_graph)
     
     def init_circles(self):
-        inner_radius = self.params.param('Inner Radius').value()
-        outer_radius = self.params.param('Outer Radius').value()
+        inner_radius = self.params.param('Manual', 'Inner Radius').value()
+        outer_radius = self.params.param('Manual', 'Outer Radius').value()
 
         # Calculate points for inner circle
         theta = np.linspace(0, 2*np.pi, 100)
@@ -81,7 +91,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.outer_circle.setData(x, y)
 
         # Initialize starting point
-        self.steps_loop(self.params.param('Outer Radius'), outer_radius)
+        self.steps_loop(self.params.param('Manual', 'Outer Radius'), outer_radius)
 
     def update_circles(self, param, value):
         # Calculate points for inner circle
@@ -94,28 +104,33 @@ class MainWindow(QtWidgets.QMainWindow):
             self.outer_circle.setData(x, y)
     
     def radius_change(self, param, value):
-        outer_radius = self.params.param('Outer Radius').value()
+        outer_radius = self.params.param('Manual', 'Outer Radius').value()
+        inner_radius = self.params.param('Manual', 'Inner Radius').value()
         if param.name() == 'Inner Radius':
-            self.params.param('Outer Radius').setLimits((value, 10))
+            self.params.param('Manual', 'Outer Radius').setLimits((value, 10))
         else:  # param.name() == 'Outer Radius'
-            self.params.param('Inner Radius').setLimits((1, value))
+            self.params.param('Manual', 'Inner Radius').setLimits((1, value))
 
         # Clear all the lines and redraw
         for line in self.tangent_lines:
             self.plot_graph.removeItem(line)
         self.tangent_lines.clear()
-
-        # Redraw the lines based on the new radius values
         self.steps_loop(param, value)
+        
         # Update the value of the starting point
-        self.params.param('Starting Point').setValue(f'(0, {outer_radius})')
+        self.params.param('Manual', 'Starting Point').setValue(f'(0, {outer_radius})')
+
+        # Calculate the ratio of the radii
+        ratio = round(outer_radius / inner_radius, 4)
+        self.params.param('Manual', 'Ratio').setValue(f"1:{ratio}")
+
 
     def steps_loop(self, param, value):
-        outer_radius = self.params.param('Outer Radius').value()
+        outer_radius = self.params.param('Manual', 'Outer Radius').value()
         outer_diameter = 2 * outer_radius
-        inner_radius = self.params.param('Inner Radius').value()
+        inner_radius = self.params.param('Manual', 'Inner Radius').value()
         inner_diameter = 2 * inner_radius
-        steps = self.params.param('Steps').value()
+        steps = self.params.param('Manual', 'Steps').value()
 
         # Calculate the length of the line
         length = np.sqrt(outer_diameter ** 2 - inner_diameter ** 2)
@@ -162,6 +177,14 @@ class MainWindow(QtWidgets.QMainWindow):
             # Calculate the coordinates of the tangent point
             tangent_point_x = current_point_x + rotated_x
             tangent_point_y = current_point_y + rotated_y
+
+            # Inside the steps_loop method after updating tangent_point_x and tangent_point_y
+
+            # Check if the line's end coordinates match the starting point
+            if np.allclose((tangent_point_x, tangent_point_y), (0, outer_radius)):
+                self.params.param('Manual', 'Complete').setValue(True)
+            else:
+                self.params.param('Manual', 'Complete').setValue(False)
 
             # Update the line coordinates
             tangent_line.setData([current_point_x, tangent_point_x], [current_point_y, tangent_point_y])
