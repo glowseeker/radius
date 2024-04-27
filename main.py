@@ -18,16 +18,18 @@ class MainWindow(QtWidgets.QMainWindow):
         # Create parameters and tree
         params = [
             {'name': 'Manual', 'type': 'group', 'children': [
-                {'name': 'Inner Radius', 'type': 'float', 'value': 1, 'limits': (1, 10), 'step': 0.1},
-                {'name': 'Outer Radius', 'type': 'float', 'value': 10, 'limits': (1, 10), 'step': 0.1},
+                {'name': 'Inner Radius', 'type': 'float', 'value': 1, 'limits': (1, 10), 'step': 0.001},
+                {'name': 'Outer Radius', 'type': 'float', 'value': 10, 'limits': (1, 10), 'step': 0.001},
                 {'name': 'Ratio', 'type': 'str', 'value': '1:10', 'readonly': True},
                 {'name': 'Starting Point', 'type': 'str', 'value': '(0, 10)', 'readonly': True},
+                {'name': 'Ending Point', 'type': 'str', 'value': '(0, 10)', 'readonly': True},
                 {'name': 'Steps', 'type': 'int', 'value': 1, 'limits': (1, 1000), 'step': 1},
-                {'name': 'Complete', 'type': 'bool', 'value': False, 'readonly': True},
+                {'name': 'Complete', 'type': 'str', 'value': 'False', 'readonly': True},
             ]},
             {'name': 'Solver', 'type': 'group', 'children': [
                 {'name': 'Desired edges', 'type': 'int', 'value': 1, 'limits': (1, 100), 'step': 1},
                 {'name': 'Necessary ratio', 'type': 'float', 'value': 1, 'limits': (1, 10), 'step': 0.0001, 'readonly': True},
+                {'name': 'Star', 'type': 'bool', 'value': 'False'},
             ]},
         ]
 
@@ -52,7 +54,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.plot_graph.plot([-11, 11], [0, 0], pen=pen)  # X-axis
         self.plot_graph.plot([0, 0], [-11, 11], pen=pen)  # Y-axis
 
-        # Connect parameter changes to circle update
+        # Connect parameters to functions
         self.params.param('Manual', 'Inner Radius').sigValueChanged.connect(self.update_circles)
         self.params.param('Manual', 'Outer Radius').sigValueChanged.connect(self.update_circles)
         self.params.param('Manual', 'Inner Radius').sigValueChanged.connect(self.radius_change)
@@ -61,6 +63,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.params.param('Manual', 'Inner Radius').sigValueChanged.connect(self.steps_loop)
         self.params.param('Manual', 'Steps').sigValueChanged.connect(self.steps_loop)
         self.params.param('Manual', 'Ratio').sigValueChanged.connect(self.radius_change)
+        self.params.param('Solver', 'Desired edges').sigValueChanged.connect(self.solver_ratio)
+        self.params.param('Solver', 'Star').sigValueChanged.connect(self.solver_ratio)
+        self.params.param('Solver', 'Necessary ratio').sigValueChanged.connect(self.solver_ratio)
 
         # Initialize the list to store the lines
         self.tangent_lines = []
@@ -118,12 +123,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.steps_loop(param, value)
         
         # Update the value of the starting point
-        self.params.param('Manual', 'Starting Point').setValue(f'(0, {outer_radius})')
+        self.params.param('Manual', 'Starting Point').setValue(f'(0.00, {outer_radius:.5f})')
 
         # Calculate the ratio of the radii
         ratio = round(outer_radius / inner_radius, 4)
         self.params.param('Manual', 'Ratio').setValue(f"1:{ratio}")
-
 
     def steps_loop(self, param, value):
         outer_radius = self.params.param('Manual', 'Outer Radius').value()
@@ -178,13 +182,14 @@ class MainWindow(QtWidgets.QMainWindow):
             tangent_point_x = current_point_x + rotated_x
             tangent_point_y = current_point_y + rotated_y
 
-            # Inside the steps_loop method after updating tangent_point_x and tangent_point_y
+            # Set the ending point of the line
+            self.params.param('Manual', 'Ending Point').setValue(f'({tangent_point_x:.5f}, {tangent_point_y:.5f})')
 
             # Check if the line's end coordinates match the starting point
             if np.allclose((tangent_point_x, tangent_point_y), (0, outer_radius)):
-                self.params.param('Manual', 'Complete').setValue(True)
+                self.params.param('Manual', 'Complete').setValue('True')
             else:
-                self.params.param('Manual', 'Complete').setValue(False)
+                self.params.param('Manual', 'Complete').setValue('False')
 
             # Update the line coordinates
             tangent_line.setData([current_point_x, tangent_point_x], [current_point_y, tangent_point_y])
@@ -192,6 +197,24 @@ class MainWindow(QtWidgets.QMainWindow):
             # Update the current point to the tangent point for the next iteration
             current_point_x = tangent_point_x
             current_point_y = tangent_point_y
+
+    def solver_ratio(self, param, value):
+        desired_edges = self.params.param('Solver', 'Desired edges').value()
+        necessary_ratio = self.params.param('Solver', 'Necessary ratio').value()
+        star = self.params.param('Solver', 'Star').value()
+
+        # Get the current values
+        desired_edges = self.params.child('Solver', 'Desired edges').value()
+        star = self.params.child('Solver', 'Star').value()
+
+        # Calculate the new ratio based on whether 'Star' is checked or not
+        if star:
+            new_ratio = desired_edges * 2  # Replace with the actual formula
+        else:
+            new_ratio = desired_edges * 0.5  # Replace with the actual formula
+
+        # Update the 'Necessary ratio' value
+        self.params.child('Solver', 'Necessary ratio').setValue(new_ratio)
 
 app = QtWidgets.QApplication([])
 main = MainWindow()
