@@ -1,5 +1,7 @@
-Description,Inner Radius,Outer Radius,Inner/Outer,Star
-Triangle,1,2,0.5,No
-,,,,
-,,,,
-,,,,
+n,Inner Radius,Outer Radius,Inner/Outer,Star
+3,1,2,0.5,No
+4,1,1.4142,sqrt(2),No
+5,8.09017,10,1:1.2361,No
+6,8.66025,10,1:1.1547,No
+7,9.00969,10,1:1.1099,No
+8,9.23879,10,1:1.0824,No

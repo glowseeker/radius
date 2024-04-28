@@ -18,8 +18,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Create parameters and tree
         params = [
             {'name': 'Manual', 'type': 'group', 'children': [
-                {'name': 'Inner Radius', 'type': 'float', 'value': 1, 'limits': (1, 10), 'step': 0.001},
-                {'name': 'Outer Radius', 'type': 'float', 'value': 10, 'limits': (1, 10), 'step': 0.001},
+                {'name': 'Inner Radius', 'type': 'float', 'value': 1, 'limits': (1, 10), 'decimals': '6'},
+                {'name': 'Outer Radius', 'type': 'float', 'value': 10, 'limits': (1, 10)},
                 {'name': 'Ratio', 'type': 'str', 'value': '1:10', 'readonly': True},
                 {'name': 'Starting Point', 'type': 'str', 'value': '(0, 10)', 'readonly': True},
                 {'name': 'Ending Point', 'type': 'str', 'value': '(0, 10)', 'readonly': True},
@@ -28,7 +28,7 @@ class MainWindow(QtWidgets.QMainWindow):
             ]},
             {'name': 'Solver', 'type': 'group', 'children': [
                 {'name': 'Desired edges', 'type': 'int', 'value': 1, 'limits': (1, 100), 'step': 1},
-                {'name': 'Necessary ratio', 'type': 'float', 'value': 1, 'limits': (1, 10), 'step': 0.0001, 'readonly': True},
+                {'name': 'Necessary ratio', 'type': 'float', 'value': 1, 'step': 0.0001, 'readonly': True},
                 {'name': 'Star', 'type': 'bool', 'value': 'False'},
             ]},
         ]
