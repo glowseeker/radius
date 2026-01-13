@@ -18,8 +18,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Create parameters and tree
         params = [
             {'name': 'Manual', 'type': 'group', 'children': [
-                {'name': 'Inner Radius', 'type': 'float', 'value': 1, 'limits': (1, 10), 'decimals': '6'},
-                {'name': 'Outer Radius', 'type': 'float', 'value': 10, 'limits': (1, 10)},
+                {'name': 'Inner Radius', 'type': 'float', 'value': 1, 'limits': (1, 10), 'decimals': 6},
+                {'name': 'Outer Radius', 'type': 'float', 'value': 10, 'limits': (1, 10), 'decimals': 6},
                 {'name': 'Ratio', 'type': 'str', 'value': '1:10', 'readonly': True},
                 {'name': 'Starting Point', 'type': 'str', 'value': '(0, 10)', 'readonly': True},
                 {'name': 'Ending Point', 'type': 'str', 'value': '(0, 10)', 'readonly': True},
